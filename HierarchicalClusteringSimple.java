@@ -1,91 +1,75 @@
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
+
+class Cluster {
+    double[] centroid;
+    List<Cluster> children = new ArrayList<>();
+
+    Cluster(double[] centroid) {
+        this.centroid = centroid;
+    }
+}
 
 public class HierarchicalClusteringSimple {
-
-    static Scanner scanner = new Scanner(System.in);
     public static void main(String[] args) {
+        int numPoints = Integer.parseInt(System.console().readLine("Enter the number of data points: "));
+        List<double[]> dataPoints = new ArrayList<>();
+        for (int i = 0; i < numPoints; i++) {
+            int numDimensions = Integer.parseInt(System.console().readLine("Enter the number of dimensions (2 or 3): "));
+            double[] point = new double[numDimensions];
+            for (int j = 0; j < numDimensions; j++) {
+                point[j] = Double.parseDouble(System.console().readLine("Enter value " + (j + 1) + ": "));
+            }
+            dataPoints.add(point);
+        }
 
-        System.out.print("Enter the number of data points: ");
-        int numPoints = scanner.nextInt();
+        hierarchicalClustering(dataPoints);
+    }
 
-        List<double[]> dataPoints = generateData(numPoints); // Generate user-defined data
-        List<Cluster> clusters = initializeClusters(dataPoints);
+    static void hierarchicalClustering(List<double[]> dataPoints) {
+        List<Cluster> clusters = new ArrayList<>();
+        for (double[] point : dataPoints) {
+            clusters.add(new Cluster(point));
+        }
 
         int clusterNumber = 1;
-
         while (clusters.size() > 1) {
+            System.out.println("\nDistance Matrix (Step " + clusterNumber + "):");
+            printDistanceMatrix(clusters);
+
             int[] closestPair = findClosestClusters(clusters);
-            Cluster mergedCluster = mergeClusters(clusters.remove(closestPair[1]), clusters.remove(closestPair[0]));
+            Cluster mergedCluster = mergeClusters(clusters.get(closestPair[0]), clusters.get(closestPair[1]));
+            clusters.remove(closestPair[1]);
+            clusters.remove(closestPair[0]);
             clusters.add(mergedCluster);
 
             System.out.println("Cluster " + clusterNumber + ":");
-            printCluster(mergedCluster, 1);
-            System.out.println();
-
-            // Calculate and print the distance matrix
-            double[][] distanceMatrix = calculateDistanceMatrix(clusters);
-            System.out.println("Distance Matrix:");
-            printDistanceMatrix(distanceMatrix);
-            System.out.println();
-
+            printCluster(mergedCluster);
             clusterNumber++;
         }
 
-        // Handle the case when there's only one cluster left
         if (clusters.size() == 1) {
-            System.out.println("Final Cluster:");
-            printCluster(clusters.get(0), 1);
+            System.out.println("\nFinal Cluster:");
+            printCluster(clusters.get(0));
         }
     }
 
-    private static List<double[]> generateData(int numPoints) {
-        List<double[]> data = new ArrayList<>();
-
-        for (int i = 0; i < numPoints; i++) {
-            System.out.print("Enter the number of dimensions (2 or 3): ");
-            int numDimensions = scanner.nextInt();
-
-            double[] point = new double[numDimensions];
-            System.out.println("Enter " + numDimensions + " values for data point " + (i + 1) + ":");
-
-            for (int j = 0; j < numDimensions; j++) {
-                point[j] = scanner.nextDouble();
-            }
-
-            data.add(point);
-        }
-        return data;
-    }
-
-    private static List<Cluster> initializeClusters(List<double[]> data) {
-        List<Cluster> clusters = new ArrayList<>();
-        for (int i = 0; i < data.size(); i++) {
-            clusters.add(new Cluster(data.get(i), i));
-        }
-        return clusters;
-    }
-
-    private static double calculateDistance(Cluster cluster1, Cluster cluster2) {
-        double[] centroid1 = cluster1.getCentroid();
-        double[] centroid2 = cluster2.getCentroid();
-        double sumSquaredDifferences = 0;
+    static double calculateDistance(double[] centroid1, double[] centroid2) {
+        double sum = 0.0;
         for (int i = 0; i < centroid1.length; i++) {
-            double difference = centroid1[i] - centroid2[i];
-            sumSquaredDifferences += difference * difference;
+            double diff = centroid1[i] - centroid2[i];
+            sum += diff * diff;
         }
-        return Math.sqrt(sumSquaredDifferences);
+        return Math.sqrt(sum);
     }
 
-    private static int[] findClosestClusters(List<Cluster> clusters) {
-        int[] closestPair = { 0, 1 };
-        double minDistance = calculateDistance(clusters.get(0), clusters.get(1));
+    static int[] findClosestClusters(List<Cluster> clusters) {
+        double minDistance = Double.POSITIVE_INFINITY;
+        int[] closestPair = {0, 1};
 
         for (int i = 0; i < clusters.size(); i++) {
             for (int j = i + 1; j < clusters.size(); j++) {
-                double distance = calculateDistance(clusters.get(i), clusters.get(j));
+                double distance = calculateDistance(clusters.get(i).centroid, clusters.get(j).centroid);
                 if (distance < minDistance) {
                     minDistance = distance;
                     closestPair[0] = i;
@@ -97,88 +81,66 @@ public class HierarchicalClusteringSimple {
         return closestPair;
     }
 
-    private static Cluster mergeClusters(Cluster cluster1, Cluster cluster2) {
-        double[] mergedCentroid = new double[cluster1.getCentroid().length];
-        for (int i = 0; i < mergedCentroid.length; i++) {
-            mergedCentroid[i] = (cluster1.getCentroid()[i] + cluster2.getCentroid()[i]) / 2;
+    static Cluster mergeClusters(Cluster cluster1, Cluster cluster2) {
+        double[] mergedCentroid = new double[cluster1.centroid.length];
+        for (int i = 0; i < cluster1.centroid.length; i++) {
+            mergedCentroid[i] = (cluster1.centroid[i] + cluster2.centroid[i]) / 2.0;
         }
 
-        List<Integer> mergedDataPoints = new ArrayList<>(cluster1.getDataPoints());
-        mergedDataPoints.addAll(cluster2.getDataPoints());
+        List<Cluster> children = new ArrayList<>();
+        children.add(cluster1);
+        children.add(cluster2);
 
-        return new Cluster(mergedCentroid, mergedDataPoints);
+        Cluster mergedCluster = new Cluster(mergedCentroid);
+        mergedCluster.children = children;
+        return mergedCluster;
     }
 
-    private static void printCluster(Cluster cluster, int level) {
-        StringBuilder indentation = new StringBuilder();
-        for (int i = 0; i < level; i++) {
-            indentation.append("  ");
-        }
+    static void printCluster(Cluster cluster) {
+        printCluster(cluster, 0);
+    }
 
-        if (cluster.getDataPoints().size() > 1) {
-            System.out.println(indentation.toString() + "Data Points: " + cluster.getDataPoints());
-            for (Cluster child : cluster.getChildren()) {
+    static void printCluster(Cluster cluster, int level) {
+        String indentation = "  ".repeat(level);
+        if (cluster.children.size() > 0) {
+            System.out.println(indentation + "Data Points: " + cluster.children.size());
+            for (Cluster child : cluster.children) {
                 printCluster(child, level + 1);
             }
         } else {
-            System.out.println(indentation.toString() + "Data Point: " + cluster.getDataPoints().get(0));
+            System.out.println(indentation + "Data Point: " + arrayToString(cluster.centroid));
         }
     }
 
-    private static double[][] calculateDistanceMatrix(List<Cluster> clusters) {
+    static void printDistanceMatrix(List<Cluster> clusters) {
         int numClusters = clusters.size();
         double[][] distanceMatrix = new double[numClusters][numClusters];
 
         for (int i = 0; i < numClusters; i++) {
-            for (int j = 0; j < numClusters; j++) {
-                if (i != j) {
-                    distanceMatrix[i][j] = calculateDistance(clusters.get(i), clusters.get(j));
-                } else {
-                    distanceMatrix[i][j] = 0.0; // Diagonal elements are 0
-                }
+            for (int j = i + 1; j < numClusters; j++) {
+                distanceMatrix[i][j] = calculateDistance(clusters.get(i).centroid, clusters.get(j).centroid);
+                distanceMatrix[j][i] = distanceMatrix[i][j];
             }
         }
 
-        return distanceMatrix;
-    }
-
-    private static void printDistanceMatrix(double[][] distanceMatrix) {
-        for (int i = 0; i < distanceMatrix.length; i++) {
-            for (int j = 0; j < distanceMatrix[0].length; j++) {
+        for (int i = 0; i < numClusters; i++) {
+            System.out.print("Cluster " + i + ": ");
+            for (int j = 0; j < numClusters; j++) {
                 System.out.printf("%.2f ", distanceMatrix[i][j]);
             }
             System.out.println();
         }
     }
 
-    public static class Cluster {
-        private double[] centroid;
-        private List<Integer> dataPoints;
-        private List<Cluster> children;
-
-        public Cluster(double[] centroid, int dataPoint) {
-            this.centroid = centroid;
-            this.dataPoints = new ArrayList<>();
-            this.children = new ArrayList<>();
-            dataPoints.add(dataPoint);
+    static String arrayToString(double[] array) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < array.length; i++) {
+            sb.append(array[i]);
+            if (i < array.length - 1) {
+                sb.append(", ");
+            }
         }
-
-        public Cluster(double[] centroid, List<Integer> dataPoints) {
-            this.centroid = centroid;
-            this.dataPoints = dataPoints;
-            this.children = new ArrayList<>();
-        }
-
-        public double[] getCentroid() {
-            return centroid;
-        }
-
-        public List<Integer> getDataPoints() {
-            return dataPoints;
-        }
-
-        public List<Cluster> getChildren() {
-            return children;
-        }
+        sb.append("]");
+        return sb.toString();
     }
 }
